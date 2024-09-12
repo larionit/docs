@@ -1262,3 +1262,93 @@ sudo systemctl status postgrespro-1c-16
 ```
 
 </details>
+
+### Создаем базу из .dt в консоли
+
+На последок, хочу показать, как создать базу с тестом Гилева в консоли. Конечно, совсем не обязательно исползовать для этого консоль, вы можете делать это любым привычным вам способом. Но я считаю эту информацию полезной.
+
+Создадим директорию:
+
+```bash
+mkdir ~/gilev && cd ~/gilev
+```
+
+Скачаем .dt выгрузку с сайта:
+
+```bash
+curl -fsSL http://www.gilev.ru/1c/tpc/GILV_TPC_G1C_83.dt -O
+```
+
+Так как дальше мы будем подключаться к СУБД, нам понадобится указать логин и пароль. Логин известен - "postgres", а вот пароль вы должны были указать свой.
+
+Давайте проверим, возвращает ли переменная пароль:
+
+```bash
+echo $onec_dbms_pass
+```
+
+Если **видите** свой пароль, **переходите** к сразу к [созданию базы](#создание-базы).
+
+Если после предыдушей команды в консоли было пусто, передадим пароль от пользователя postgres в переменную.
+
+```bash
+onec_dbms_pass="тут_пароль_который_вы_задали"
+```
+
+*Примечание: в команде выше замените текст в кавычках на пароль, который вы указали на [этом этапе](#установка-пароля).*
+
+#### Создание базы
+
+Создадим базу из .dt выгрузки напрямую в СУБД:
+
+```bash
+/opt/1cv8/x86_64/8.3.25.1394/ibcmd infobase create --dbms=PostgreSQL --db-server=localhost --db-user=postgres --db-pwd=$onec_dbms_pass --db-name=gilev --create-database --restore=GILV_TPC_G1C_83.dt
+```
+
+Пример вывода:
+
+```bash
+~/gilev$ /opt/1cv8/x86_64/8.3.25.1394/ibcmd infobase create --dbms=PostgreSQL --db-server=localhost --db-user=postgres --db-pwd=$onec_dbms_pass --db-name=gilev --create-database --restore=GILV_TPC_G1C_83.dt
+[INFO] Создание информационной базы...
+[INFO] Создание информационной базы успешно завершено
+[INFO] Загрузка информационной базы...
+[INFO] Загрузка информационной базы успешно завершена
+```
+
+Осталось добавить базу в кластер 1С. Что бы это сделать, нужно знать guid кластера.
+
+Получаем guid локального кластера и передаем в переменную:
+
+```bash
+cluster_guid=$(/opt/1cv8/x86_64/8.3.25.1394/rac localhost:1545 cluster list | grep cluster | awk '{print $3}')
+```
+
+Проверяем:
+
+```bash
+echo $cluster_guid
+```
+
+Команда должна вернуть guid (у вас значение будет свое):
+
+```bash
+~/gilev$ echo $cluster_guid
+dd503976-fa4b-4940-a470-1f8591cf1239
+```
+
+В моем случае guid кластера: `dd503976-fa4b-4940-a470-1f8591cf1239`.
+
+Теперь добавим базу в кластер:
+
+```bash
+/opt/1cv8/x86_64/8.3.25.1394/rac localhost:1545 infobase --cluster=$cluster_guid create --name="gilev" --dbms="PostgreSQL" --db-server="localhost" --db-name="gilev" --locale=ru --db-user="postgres" --db-pwd="$onec_dbms_pass" --license-distribution=allow
+```
+
+В случае успешного добавления базы в кластер команда выведет guid базы:
+
+```bash
+~/gilev$ /opt/1cv8/x86_64/8.3.25.1394/rac localhost:1545 infobase --cluster=$cluster_guid create --name="gilev" --dbms="PostgreSQL" --db-server="localhost" --db-name="gilev" --locale=ru --db-user="postgres" --db-pwd="$onec_dbms_pass" --license-distribution=allow
+infobase : b2643ee3-4af9-4966-b528-9f1baf7d042f
+```
+
+На этом все!
